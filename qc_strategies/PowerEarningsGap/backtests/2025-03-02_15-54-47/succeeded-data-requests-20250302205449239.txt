@@ -1,0 +1,3 @@
+/equity/usa/hour/spy.zip
+/symbol-properties/security-database.csv
+/alternative/interest-rate/usa/interest-rate.csv
