@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta, date
 import requests
 import sys
+import os
+from openpyxl import load_workbook
 
 pd.options.display.float_format = '{:,.4f}'.format
 
@@ -28,7 +30,8 @@ def calcGammaEx(S, K, vol, T, r, q, optType, OI):
 def isThirdFriday(d):
     return d.weekday() == 4 and 15 <= d.day <= 21
 
-index = sys.argv[1]
+# Use SPX as default if no argument is provided
+index = sys.argv[1] if len(sys.argv) > 1 else "SPX"
 
 # Get options data
 response = requests.get(url="https://cdn.cboe.com/api/global/delayed_quotes/options/_" + index + ".json")
@@ -95,7 +98,24 @@ df['CallGEX'] = df['CallGamma'] * df['CallOpenInt'] * 100 * spotPrice * spotPric
 df['PutGEX'] = df['PutGamma'] * df['PutOpenInt'] * 100 * spotPrice * spotPrice * 0.01 * -1
 
 df['TotalGamma'] = (df.CallGEX + df.PutGEX) / 10**9
-df.to_excel("output.xlsx")  
+
+xls_file = "gamma/plot/gamma-analysis.xlsx"
+# Write to Excel while preserving other sheets
+if os.path.exists(xls_file):
+    # If file exists, load it and copy all sheets except Raw Data
+    book = load_workbook(xls_file)
+    if "Raw Data" in book.sheetnames:
+        # Remove the existing Raw Data sheet
+        book.remove(book[book.sheetnames[book.sheetnames.index("Raw Data")]])
+    book.save(xls_file)
+    
+    # Now write the new data
+    with pd.ExcelWriter(xls_file, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+        df.to_excel(writer, sheet_name="Raw Data", index=False)
+else:
+    # If file doesn't exist, create it with the Raw Data sheet
+    with pd.ExcelWriter(xls_file, engine='openpyxl', mode='w') as writer:
+        df.to_excel(writer, sheet_name="Raw Data", index=False)
 
 dfAgg = df.groupby(['StrikePrice']).sum(numeric_only=True)
 strikes = dfAgg.index.values
